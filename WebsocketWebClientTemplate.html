@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Websocket Template - IEEE - UTK</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+    <style type="text/css">
+    </style>
+</head>
+<body style="padding-top: 50px;">
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">IEEE Robotics - UTK</a>
+            </div>
+            <div id="navbar" class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="index.html">Websocket Template</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <header style="margin-bottom: 20px;">
+            <h1>Websocket Template</h1>
+        </header>
+        <div class="row">
+            <div class="col-lg-3">
+                <div class="input-group" id="deviceGroup">
+                    <span class="input-group-addon">Device</span>
+                    <select class="form-control" id="deviceList">
+                        <option value=""></option>
+                        <option value="216.96.173.179:9002">Blu Bot</option>
+                    </select>
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" type="button" id="deviceSubmit">Connect</button>
+                    </span>
+                </div>
+            </div>
+            <div class="col-lg-3" style="display: none;">
+                <div class="input-group" id="pinGroup">
+                    <span class="input-group-addon">Pin</span>
+                    <input type="text" class="form-control" id="pinInput" disabled />
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" type="button" id="pinSubmit" disabled>Submit</button>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="panel panel-default">
+                    <div class="panel-heading clearfix">Chat</div>
+                    <div class="panel-body">
+                        <textarea id="chat" class="form-control" rows="10" readonly></textarea>
+                        <div class="input-group">
+                            <input id="input" class="form-control" type="text"/>
+                            <span class="input-group-btn">
+                                <button id="inputSubmit" class="btn btn-primary" type="button">Submit</button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Console</div>
+                    <div class="panel-body"><textarea id="console" class="form-control" rows="10" readonly></textarea></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <hr />
+    <footer class="container">
+        <p>&copy; 2016 - UTK IEEE Robotics Club</p>
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <script>
+        var verified = false;
+        var ws = null; //Websocket connection
+    
+        //Function to run a command with the modified input
+        function runCmd(cmd, input, func) {
+            if (input.substring(0, cmd.length) == cmd) {
+                func(input.substring(cmd.length));
+                return true;
+            }
+            else
+                return false;
+        }
+
+        $(function () {
+            $("#deviceSubmit").click(function () {
+                if (ws == null) {
+                    ws = new WebSocket("ws://" + $("#deviceList").val() + "/");
+                    ws.onopen = function () {
+                        //Successfully Connected, show success and change button to disconnect
+                        $("#deviceGroup").addClass("has-success");
+                        $("#deviceList").prop("disabled", true);
+                        $("#deviceSubmit").text("Disconnect").addClass("btn-danger");
+
+                        //Show the pin group and enable input and button
+                        $("#pinGroup").parent().show("slide", null, 400, function () {
+                            $("#pinInput").prop("disabled", false);
+                            $("#pinSubmit").prop("disabled", false);
+                        });
+                    };
+                    ws.onclose = function () {
+                        //Reset the device group
+                        $("#deviceGroup").removeClass("has-success");
+                        $("#deviceList").prop("disabled", false);
+                        $("#deviceSubmit").text("Connect").removeClass("btn-danger").addClass("btn-primary");
+
+                        //Reset the pin group
+                        $("#pinGroup").parent().css("display", "none");
+                        $("#pinGroup").removeClass("has-success");
+                        $("#pinInput").prop("disabled", true).val("");
+                        $("#pinSubmit").prop("disabled", true);
+                    };
+                    ws.onmessage = function (event) {
+                        var message = event.data;
+                        
+                        //Do something with the message from the server
+                        $("#console").append(message + "\n");
+                        
+                        if (runCmd("Verified", message, function (input) {
+                            //Pin was verified
+                            verified = true;
+
+                            //Disable and hide the pin group
+                            $("#pinGroup").addClass("has-success");
+                            $("#pinSubmit").prop("disabled", true);
+                            $("#pinInput").prop("disabled", true);
+                            $("#pinGroup").parent().hide("slide", null, 400, function () {
+                                //Do something after pin group is hidden
+                            });
+                        })) { return; }
+
+                        if (runCmd("PrintMessage", message, function (input) {
+                            //Server told us to print a message
+                            $("#chat").append(input + "\n");
+                        })) { return; }
+                    };
+                }
+                else {
+                    //We have a websocket connection, so we're disconnecting
+                    ws.close();
+                    verified = false;
+                    ws = null;
+                }
+            });
+
+            $("#pinSubmit").click(function () {
+                //Send the pin number
+                var pin = $("#pinInput").val();
+                ws.send(pin);
+            });
+            
+            $("#inputSubmit").click(function() {
+                //Get the input and clear the input box
+                var input = $("#input").val();
+                $("#input").val("");
+                
+                //Post the message to the server and append the output to the console
+                ws.send("PostMessage" + input);
+                $("#console").append("> " + "PostMessage" + input + "\n");
+            });
+        });
+    </script>
+</body>
+</html>
